@@ -92,6 +92,7 @@
 
     #map { height: 42dvh; min-height: 240px; margin: 0 12px; border-radius: 22px; overflow: hidden; border: 3px solid var(--pencil); }
     .leaflet-container { background: #c5d5c4; font-family: Fraunces, serif; }
+    .leaflet-control-attribution { font-size: 9px; background: rgba(255,255,255,.7); }
 
     .pin {
       width: 28px; height: 36px; position: relative;
@@ -173,12 +174,14 @@
     .hcard p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
     .scorewrap { padding: 0 12px 28px; }
-    .players { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; }
+    .players { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 10px; }
     .players button, .players .add {
       white-space: nowrap; border-radius: 999px; border: 1px solid rgba(243,234,211,.25);
       background: transparent; color: var(--ball); padding: 8px 12px; font-family: Syne, sans-serif;
     }
     .players button.on { background: var(--pencil); color: var(--ink); }
+    .players .pgroup { display: inline-flex; gap: 4px; }
+    .players button.del { border-color: var(--flag); color: var(--flag); padding: 8px 11px; }
     table.card {
       width: 100%; border-collapse: collapse; background: var(--card); color: var(--ink);
       border-radius: 20px; overflow: hidden; font-size: 13px;
@@ -211,7 +214,8 @@
       </div>
       <div class="tot">
         <span>Your total</span>
-        <b id="running">—</b>
+        <b id="running">0</b>
+        <span id="runningVs">0 vs par</span>
       </div>
     </header>
     <nav class="tabs">
@@ -326,6 +330,7 @@
       const p = state.pens[name] || [];
       return s.reduce((acc, v, i) => acc + (v == null ? 0 : v) + (p[i] || 0), 0);
     }
+    function fmtDiff(diff) { return diff > 0 ? `+${diff}` : `${diff}`; }
     function vsPar(name) {
       const s = state.scores[name] || [];
       let played = 0, diff = 0;
@@ -362,8 +367,11 @@
     }
 
     const mapEl = document.getElementById("map");
-    map = L.map(mapEl, { zoomControl: false, attributionControl: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+    map = L.map(mapEl, { zoomControl: false });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap",
+    }).addTo(map);
     const line = L.polyline(HOLES.map(h => [h.lat, h.lng]), { color: "#e23d28", weight: 3, dashArray: "6 8", opacity: 0.9 }).addTo(map);
 
     function pinIcon(n, on) {
@@ -407,9 +415,12 @@
       const opts = Object.entries(DRINKS).map(([k, v]) =>
         `<option value="${k}" ${k === drink ? "selected" : ""}>${v.label} · par ${v.par}</option>`
       ).join("");
-      const pad = [1, 2, 3, 4, 5, 6, 7, 8].map(n =>
+      const PAD_MAX = 7;
+      const custom = sips != null && sips > PAD_MAX;
+      const pad = [1, 2, 3, 4, 5, 6, 7].map(n =>
         `<button type="button" data-sips="${n}" class="${sips === n ? "on" : ""}">${n}</button>`
-      ).join("");
+      ).join("") +
+        `<button type="button" id="moreSips" class="${custom ? "on" : ""}">${custom ? sips : "More"}</button>`;
       document.getElementById("holeSheet").innerHTML = `
         <div class="hole-kicker"><span>Hole ${i + 1} of 12</span><span>Par ${par}${next ? " · next " + walk + "m" : ""}</span></div>
         <h2>${h.name}</h2>
@@ -429,7 +440,7 @@
         </div>
         <div class="navh">
           <button type="button" class="dim" id="prevH">Previous</button>
-          <button type="button" id="nextH">${next ? "Next · " + next.name : "See card"}</button>
+          <button type="button" id="nextH">${next ? "Next" : "See card"}</button>
         </div>
       `;
       document.getElementById("drinkSel").onchange = (e) => {
@@ -443,6 +454,19 @@
           save(); renderSheet(); renderTable(); renderRunning();
         };
       });
+      document.getElementById("moreSips").onclick = () => {
+        const entered = prompt("Sips for this hole?", sips == null ? "" : String(sips));
+        if (entered === null) return;
+        const trimmed = entered.trim();
+        if (trimmed === "") {
+          state.scores[name][i] = null;
+        } else {
+          const n = Number(trimmed);
+          if (!Number.isInteger(n) || n < 1 || n > 99) return;
+          state.scores[name][i] = n;
+        }
+        save(); renderSheet(); renderTable(); renderRunning();
+      };
       document.querySelectorAll("[data-code]").forEach(btn => {
         btn.onclick = () => {
           setPen(name, i, btn.dataset.code, Number(btn.dataset.val));
@@ -471,11 +495,29 @@
     }
 
     function renderPlayers() {
+      const removable = state.players.length > 1;
       document.getElementById("playerBar").innerHTML =
-        state.players.map((p, i) => `<button type="button" class="${i === state.active ? "on" : ""}" data-p="${i}">${p}</button>`).join("") +
+        state.players.map((p, i) => {
+          const pill = `<button type="button" class="${i === state.active ? "on" : ""}" data-p="${i}">${p}</button>`;
+          const del = i === state.active && removable
+            ? `<button type="button" class="del" data-del="${i}" aria-label="Remove ${p}">✕</button>`
+            : "";
+          return `<span class="pgroup">${pill}${del}</span>`;
+        }).join("") +
         `<button type="button" class="add" id="addPlayer">+ player</button>`;
       document.querySelectorAll("#playerBar [data-p]").forEach(b => b.onclick = () => {
         state.active = Number(b.dataset.p); save(); renderPlayers(); renderTable(); renderSheet(); renderRunning();
+      });
+      document.querySelectorAll("#playerBar [data-del]").forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.del);
+        const name = state.players[i];
+        if (!confirm(`Remove ${name} and their scores?`)) return;
+        state.players.splice(i, 1);
+        delete state.scores[name];
+        delete state.pens[name];
+        if (state.pens.code) delete state.pens.code[name];
+        state.active = Math.min(state.active, state.players.length - 1);
+        save(); renderPlayers(); renderTable(); renderSheet(); renderRunning();
       });
       document.getElementById("addPlayer").onclick = () => {
         const n = prompt("Player name?");
@@ -497,22 +539,23 @@
         const p = state.pens[name][i] || 0;
         const tot = s == null ? "·" : s + p;
         const d = s == null ? "" : (s + p - parOf(i));
-        const vs = d === "" ? "" : d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`;
+        const vs = d === "" ? "" : fmtDiff(d);
         return `<tr><td class="mono">${i + 1}</td><td>${h.name}</td><td>${parOf(i)}</td><td>${tot}</td><td class="vs">${vs}</td></tr>`;
       }).join("");
       const { diff, played } = vsPar(name);
-      const vs = played ? (diff === 0 ? "E" : diff > 0 ? `+${diff}` : `${diff}`) : "—";
+      const vs = played ? fmtDiff(diff) : "0";
       document.getElementById("scoreTable").innerHTML = `
         <thead><tr><th>#</th><th>${name}</th><th>Par</th><th>Score</th><th>vs</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td></td><td>Total</td><td>${coursePar()}</td><td>${playerTotal(name) || "—"}</td><td>${vs}</td></tr></tfoot>
+        <tfoot><tr><td></td><td>Total</td><td>${coursePar()}</td><td>${playerTotal(name)}</td><td>${vs}</td></tr></tfoot>
       `;
     }
 
     function renderRunning() {
       const name = state.players[state.active];
-      const { diff, played } = vsPar(name);
-      document.getElementById("running").textContent = played ? (diff === 0 ? "E" : diff > 0 ? `+${diff}` : `${diff}`) : "E";
+      const { diff } = vsPar(name);
+      document.getElementById("running").textContent = playerTotal(name);
+      document.getElementById("runningVs").textContent = `${fmtDiff(diff)} vs par`;
     }
 
     document.getElementById("copyCard").onclick = async () => {
@@ -525,7 +568,7 @@
         lines.push(`${i + 1}. ${h.name}  ${DRINKS[state.drinks[i]].label}  par ${parOf(i)}  ${tot}`);
       });
       const { diff } = vsPar(name);
-      lines.push("", `Total ${playerTotal(name)}  (${diff === 0 ? "E" : diff > 0 ? "+" + diff : diff}) vs par ${coursePar()}`);
+      lines.push("", `Total ${playerTotal(name)}  (${fmtDiff(diff)}) vs par ${coursePar()}`);
       const text = lines.join("\n");
       try { await navigator.clipboard.writeText(text); alert("Copied. Paste into the group chat."); }
       catch { prompt("Copy this:", text); }
