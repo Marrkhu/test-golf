@@ -30,7 +30,7 @@
       --safe-b: env(safe-area-inset-bottom);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; height: 100%; background: var(--fairway); color: var(--ball); }
+    html, body { margin: 0; background: var(--fairway); color: var(--ball); overflow-x: hidden; }
     body {
       font-family: Fraunces, Georgia, serif;
       padding: var(--safe-t) 0 var(--safe-b);
@@ -44,12 +44,12 @@
       display: flex;
       flex-direction: column;
     }
-    header.top {
-      padding: 14px 16px 10px;
+    header.top { padding: 12px 16px 10px; }
+    header.top .metarow {
       display: flex;
       justify-content: space-between;
-      align-items: flex-end;
-      gap: 12px;
+      align-items: center;
+      gap: 10px;
     }
     header.top .eyebrow {
       font-family: "IBM Plex Mono", monospace;
@@ -58,17 +58,24 @@
       text-transform: uppercase;
       color: var(--pencil);
     }
-    header.top h1 { margin: 2px 0 0; font-size: 28px; line-height: 0.95; }
+    header.top h1 {
+      margin: 4px 0 0;
+      font-size: clamp(19px, 6.3vw, 31px);
+      line-height: 1.02;
+      white-space: nowrap;
+    }
     .tot {
-      text-align: right;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: baseline;
+      gap: 7px;
       background: rgba(243, 234, 211, 0.08);
       border: 1px solid rgba(243, 234, 211, 0.16);
-      border-radius: 16px;
-      padding: 8px 12px;
-      min-width: 92px;
+      border-radius: 999px;
+      padding: 5px 12px;
     }
-    .tot b { display: block; font-size: 22px; font-family: Syne, sans-serif; }
-    .tot span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #c9bfa8; }
+    .tot b { font-size: 17px; line-height: 1; font-family: Syne, sans-serif; font-variant-numeric: tabular-nums; }
+    .tot span { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #c9bfa8; white-space: nowrap; }
 
     .tabs {
       display: grid;
@@ -87,8 +94,8 @@
     }
     .tabs button.on { background: var(--pencil); color: var(--ink); border-color: var(--pencil); }
 
-    .panel { display: none; flex: 1; }
-    .panel.on { display: flex; flex-direction: column; }
+    .panel { display: none; }
+    .panel.on { display: flex; flex-direction: column; flex: 1 0 auto; }
 
     #map { height: 42dvh; min-height: 240px; margin: 0 12px; border-radius: 22px; overflow: hidden; border: 3px solid var(--pencil); }
     .leaflet-container { background: #c5d5c4; font-family: Fraunces, serif; }
@@ -121,7 +128,16 @@
       font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
     }
     .sheet h2 { margin: 4px 0 2px; font-size: 26px; }
-    .addr { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+    .addr {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.35;
+      height: 1.35em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .row { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip, .maps {
       display: inline-flex; align-items: center; justify-content: center;
@@ -199,6 +215,8 @@
     .rules h3 { font-size: 16px; margin: 16px 0 6px; }
     .rules p, .rules li { color: #3c362e; font-size: 15px; line-height: 1.45; }
     .rules a { color: var(--flag-dark); }
+    .steps { margin: 0 0 14px; padding-left: 20px; }
+    .steps li { margin-bottom: 6px; }
     .hint {
       margin: 12px 12px 0; font-size: 13px; color: #c9bfa8; text-align: center;
     }
@@ -208,15 +226,15 @@
 <body>
   <div class="app">
     <header class="top">
-      <div>
+      <div class="metarow">
         <div class="eyebrow">Fri 18 Sep · 12 holes</div>
-        <h1>Notting Hill<br>Open</h1>
+        <div class="tot">
+          <span>Total</span>
+          <b id="running">0</b>
+          <span id="runningVs">0 vs par</span>
+        </div>
       </div>
-      <div class="tot">
-        <span>Your total</span>
-        <b id="running">0</b>
-        <span id="runningVs">0 vs par</span>
-      </div>
+      <h1>Notting Hill Open</h1>
     </header>
     <nav class="tabs">
       <button class="on" data-tab="map">Map</button>
@@ -227,7 +245,6 @@
 
     <section id="tab-map" class="panel on">
       <div id="map"></div>
-      <p class="hint">Walk is ~3.4 km, south from Kensington Church Street up Portobello, then east to Westbourne.</p>
       <div class="sheet" id="holeSheet"></div>
     </section>
 
@@ -269,8 +286,18 @@
           <p>One drink per pub. Water between holes. Sit one out whenever you like — switch to a soft and keep the card going.</p>
           <p>Costume: polos, visors, argyle, ridiculous trousers. Mini club optional, encouraged.</p>
           <p><a href="https://www.socialsticks.co.uk/blog/play-pub-golf-tips-rules-costumes">Source rules</a></p>
+          <h3>Put it on your Home Screen</h3>
+          <div class="row" style="margin-bottom:14px">
+            <button class="chip" type="button" id="a2hs">Show me how</button>
+            <button class="chip ghost maps" type="button" id="shareLink">Send link to the group</button>
+          </div>
+          <ol class="steps" id="a2hsSteps" hidden>
+            <li>Tap the Share button in Safari's bottom bar — the square with an arrow.</li>
+            <li>Scroll down the list and tap <b>Add to Home Screen</b>.</li>
+            <li>Tap <b>Add</b>. It now opens full screen, no address bar.</li>
+          </ol>
         </article>
-        <p class="hint">Add to Home Screen in Safari so it opens like an app. Each phone keeps its own card.</p>
+        <p class="hint">Each phone keeps its own card.</p>
       </div>
     </section>
   </div>
@@ -424,7 +451,7 @@
       document.getElementById("holeSheet").innerHTML = `
         <div class="hole-kicker"><span>Hole ${i + 1} of 12</span><span>Par ${par}${next ? " · next " + walk + "m" : ""}</span></div>
         <h2>${h.name}</h2>
-        <p class="addr">${h.addr}<br>${h.note}</p>
+        <p class="addr" title="${h.addr} · ${h.note}">${h.addr} · ${h.note}</p>
         <div class="row">
           <a class="maps" href="${gmaps(h)}" target="_blank" rel="noopener">Google Maps</a>
           <a class="maps ghost" href="${amaps(h)}" target="_blank" rel="noopener">Apple Maps</a>
@@ -582,6 +609,23 @@
       save(); renderSheet(); renderTable(); renderRunning();
     };
 
+    const installed = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+    const a2hsBtn = document.getElementById("a2hs");
+    if (installed) {
+      a2hsBtn.textContent = "Already on your Home Screen";
+      a2hsBtn.disabled = true;
+      a2hsBtn.style.opacity = 0.55;
+    }
+    a2hsBtn.onclick = () => { document.getElementById("a2hsSteps").hidden = false; };
+    document.getElementById("shareLink").onclick = async () => {
+      const url = location.href;
+      if (navigator.share) {
+        try { await navigator.share({ title: "Notting Hill Open · pub golf", url }); return; } catch { return; }
+      }
+      try { await navigator.clipboard.writeText(url); alert("Link copied."); }
+      catch { prompt("Copy this link:", url); }
+    };
+
     document.querySelectorAll(".tabs button").forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
@@ -597,7 +641,10 @@
     renderPlayers();
     renderTable();
     renderRunning();
-    setTimeout(() => map.invalidateSize(), 200);
+    // Leaflet measures the container before web fonts settle the layout, so re-fit once it has.
+    const fitCourse = () => { map.invalidateSize(); map.fitBounds(line.getBounds().pad(0.18)); };
+    addEventListener("load", fitCourse);
+    setTimeout(fitCourse, 400);
   </script>
 </body>
 </html>
