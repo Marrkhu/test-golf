@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NH Open" />
+  <meta name="theme-color" content="#123528" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Notting Hill Open · Pub Golf</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%23123528' width='64' height='64' rx='12'/%3E%3Cpath fill='%23e23d28' d='M34 8l18 10-18 6z'/%3E%3Crect fill='%23f4f0e1' x='32' y='8' width='3' height='42'/%3E%3Ccircle fill='%23f4f0e1' cx='33.5' cy='54' r='5'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --fairway: #123528;
+      --fairway-2: #1c4a38;
+      --flag: #e23d28;
+      --flag-dark: #b91c12;
+      --ball: #f3ead3;
+      --pencil: #e3b23c;
+      --ink: #14110e;
+      --muted: #6d6458;
+      --card: #f7f1e4;
+      --line: rgba(20, 17, 14, 0.12);
+      --safe-t: env(safe-area-inset-top);
+      --safe-b: env(safe-area-inset-bottom);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: var(--fairway); color: var(--ball); }
+    body {
+      font-family: Fraunces, Georgia, serif;
+      padding: var(--safe-t) 0 var(--safe-b);
+    }
+    button, select, input { font: inherit; }
+    h1, h2, .syne { font-family: Syne, sans-serif; font-weight: 800; letter-spacing: -0.03em; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+    .app {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    header.top {
+      padding: 14px 16px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+    }
+    header.top .eyebrow {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--pencil);
+    }
+    header.top h1 { margin: 2px 0 0; font-size: 28px; line-height: 0.95; }
+    .tot {
+      text-align: right;
+      background: rgba(243, 234, 211, 0.08);
+      border: 1px solid rgba(243, 234, 211, 0.16);
+      border-radius: 16px;
+      padding: 8px 12px;
+      min-width: 92px;
+    }
+    .tot b { display: block; font-size: 22px; font-family: Syne, sans-serif; }
+    .tot span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #c9bfa8; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      padding: 0 12px 10px;
+    }
+    .tabs button {
+      background: transparent;
+      border: 1px solid rgba(243, 234, 211, 0.18);
+      color: var(--ball);
+      border-radius: 999px;
+      padding: 8px 0;
+      font-family: Syne, sans-serif;
+      font-size: 13px;
+    }
+    .tabs button.on { background: var(--pencil); color: var(--ink); border-color: var(--pencil); }
+
+    .panel { display: none; flex: 1; }
+    .panel.on { display: flex; flex-direction: column; }
+
+    #map { height: 42dvh; min-height: 240px; margin: 0 12px; border-radius: 22px; overflow: hidden; border: 3px solid var(--pencil); }
+    .leaflet-container { background: #c5d5c4; font-family: Fraunces, serif; }
+
+    .pin {
+      width: 28px; height: 36px; position: relative;
+    }
+    .pin i {
+      display: grid; place-items: center;
+      width: 26px; height: 26px; border-radius: 50% 50% 50% 4px;
+      transform: rotate(-45deg);
+      background: var(--fairway); color: var(--ball);
+      border: 2px solid var(--ball);
+      font-family: Syne, sans-serif; font-size: 12px; font-style: normal;
+    }
+    .pin i span { transform: rotate(45deg); display: block; }
+    .pin.now i { background: var(--flag); }
+
+    .sheet {
+      margin: 12px;
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.28);
+    }
+    .hole-kicker {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    }
+    .sheet h2 { margin: 4px 0 2px; font-size: 26px; }
+    .addr { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip, .maps {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 10px 12px; border-radius: 14px; text-decoration: none;
+      font-family: Syne, sans-serif; font-size: 14px; color: var(--ball);
+      background: var(--fairway); flex: 1; min-height: 44px; text-align: center;
+    }
+    .maps.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
+    label.drink {
+      display: block; margin: 14px 0 8px;
+      font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    }
+    select, input[type=text] {
+      width: 100%; background: #efe6d3; border: 0; border-radius: 14px; padding: 12px 14px; font-size: 16px; color: var(--ink);
+    }
+    .parbox {
+      margin-top: 10px; display: flex; justify-content: space-between; align-items: center;
+      background: var(--fairway); color: var(--ball); border-radius: 16px; padding: 10px 14px;
+    }
+    .parbox b { font-family: Syne, sans-serif; font-size: 20px; color: var(--pencil); }
+
+    .score-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+    .score-pad button {
+      height: 52px; border: 0; border-radius: 14px; background: #efe6d3; color: var(--ink);
+      font-family: Syne, sans-serif; font-size: 18px;
+    }
+    .score-pad button.on { background: var(--flag); color: #fff; }
+    .pens { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .pens button {
+      border: 1.5px dashed var(--ink); background: transparent; border-radius: 14px; padding: 10px 6px;
+      font-size: 13px; font-family: Syne, sans-serif;
+    }
+    .pens button.on { background: var(--ink); color: var(--ball); border-style: solid; }
+
+    .navh { display: flex; gap: 8px; margin-top: 12px; }
+    .navh button {
+      flex: 1; height: 46px; border: 0; border-radius: 14px; background: var(--pencil); color: var(--ink);
+      font-family: Syne, sans-serif;
+    }
+    .navh button.dim { background: #efe6d3; }
+
+    .list { padding: 0 12px 24px; display: flex; flex-direction: column; gap: 10px; }
+    .hcard {
+      background: var(--card); color: var(--ink); border-radius: 20px; padding: 14px; text-align: left;
+      border: 0; width: 100%;
+    }
+    .hcard.on { outline: 3px solid var(--pencil); }
+    .hcard .n { font-family: Syne, sans-serif; color: var(--flag); }
+    .hcard h3 { margin: 0; font-size: 18px; }
+    .hcard p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    .scorewrap { padding: 0 12px 28px; }
+    .players { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; }
+    .players button, .players .add {
+      white-space: nowrap; border-radius: 999px; border: 1px solid rgba(243,234,211,.25);
+      background: transparent; color: var(--ball); padding: 8px 12px; font-family: Syne, sans-serif;
+    }
+    .players button.on { background: var(--pencil); color: var(--ink); }
+    table.card {
+      width: 100%; border-collapse: collapse; background: var(--card); color: var(--ink);
+      border-radius: 20px; overflow: hidden; font-size: 13px;
+    }
+    table.card th, table.card td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+    table.card th:nth-child(2), table.card td:nth-child(2) { text-align: left; }
+    table.card tfoot td { font-family: Syne, sans-serif; background: var(--fairway); color: var(--ball); }
+    .vs { color: var(--flag); font-weight: 700; }
+
+    .rules { padding: 0 12px 32px; }
+    .rules article {
+      background: var(--card); color: var(--ink); border-radius: 22px; padding: 18px 18px 8px;
+    }
+    .rules h2 { margin: 0 0 8px; }
+    .rules h3 { font-size: 16px; margin: 16px 0 6px; }
+    .rules p, .rules li { color: #3c362e; font-size: 15px; line-height: 1.45; }
+    .rules a { color: var(--flag-dark); }
+    .hint {
+      margin: 12px 12px 0; font-size: 13px; color: #c9bfa8; text-align: center;
+    }
+    .pin-legend { position: absolute; z-index: 500; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div>
+        <div class="eyebrow">Fri 18 Sep · 12 holes</div>
+        <h1>Notting Hill<br>Open</h1>
+      </div>
+      <div class="tot">
+        <span>Your total</span>
+        <b id="running">—</b>
+      </div>
+    </header>
+    <nav class="tabs">
+      <button class="on" data-tab="map">Map</button>
+      <button data-tab="holes">Holes</button>
+      <button data-tab="score">Card</button>
+      <button data-tab="rules">Rules</button>
+    </nav>
+
+    <section id="tab-map" class="panel on">
+      <div id="map"></div>
+      <p class="hint">Walk is ~3.4 km, south from Kensington Church Street up Portobello, then east to Westbourne.</p>
+      <div class="sheet" id="holeSheet"></div>
+    </section>
+
+    <section id="tab-holes" class="panel">
+      <div class="list" id="holeList"></div>
+    </section>
+
+    <section id="tab-score" class="panel">
+      <div class="scorewrap">
+        <div class="players" id="playerBar"></div>
+        <table class="card" id="scoreTable"></table>
+        <div class="row" style="margin-top:12px">
+          <button class="chip" id="copyCard" type="button">Copy card for WhatsApp</button>
+          <button class="chip ghost maps" id="resetScores" type="button" style="background:#efe6d3;color:#14110e">Reset my scores</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-rules" class="panel">
+      <div class="rules">
+        <article>
+          <h2>How we play</h2>
+          <p>Each pub is a hole. Finish the assigned drink in as few sips as possible. Lowest total wins. A down-in-one is a hole-in-one, whatever the par.</p>
+          <h3>Par</h3>
+          <ul>
+            <li>Pint · par 4</li>
+            <li>Wine · par 3</li>
+            <li>Shot · par 1</li>
+            <li>Cocktail · par 3 · highball par 4</li>
+            <li>Soft drink · same par as the hole’s alcoholic drink</li>
+          </ul>
+          <h3>Penalties</h3>
+          <ul>
+            <li>Spill +1</li>
+            <li>Loo between pubs +1</li>
+            <li>Leave any drink +2</li>
+          </ul>
+          <h3>Pace</h3>
+          <p>One drink per pub. Water between holes. Sit one out whenever you like — switch to a soft and keep the card going.</p>
+          <p>Costume: polos, visors, argyle, ridiculous trousers. Mini club optional, encouraged.</p>
+          <p><a href="https://www.socialsticks.co.uk/blog/play-pub-golf-tips-rules-costumes">Source rules</a></p>
+        </article>
+        <p class="hint">Add to Home Screen in Safari so it opens like an app. Each phone keeps its own card.</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const DRINKS = {
+      pint: { label: "Pint", par: 4 },
+      guinness: { label: "Guinness pint", par: 4 },
+      wine: { label: "Wine", par: 3 },
+      shot: { label: "Shot", par: 1 },
+      cocktail: { label: "Cocktail", par: 3 },
+      highball: { label: "Highball", par: 4 },
+      half: { label: "Half pint", par: 3 },
+      soft: { label: "Soft drink", par: 4 },
+    };
+
+    const HOLES = [
+      { name: "Churchill Arms", addr: "119 Kensington Church St, W8 7LN", lat: 51.5068785, lng: -0.1948694, drink: "pint", note: "Flower-covered Fuller's. Warm-up pint." },
+      { name: "Uxbridge Arms", addr: "13 Uxbridge St, W8 7TQ", lat: 51.5083236, lng: -0.1988269, drink: "wine", note: "Hillgate Village. Tiny, proper." },
+      { name: "Prince Albert", addr: "11 Pembridge Rd, W11 3HQ", lat: 51.5095361, lng: -0.1975022, drink: "pint", note: "Notting Hill Gate. Pint on the pavement." },
+      { name: "Sun in Splendour", addr: "7 Portobello Rd, W11 3DA", lat: 51.5109437, lng: -0.1978302, drink: "cocktail", note: "Bottom of Portobello. Cocktail hole." },
+      { name: "Earl of Lonsdale", addr: "277–281 Westbourne Grove, W11 2QA", lat: 51.5134425, lng: -0.2027103, drink: "pint", note: "Corner of Portobello. Carnival photos on the walls." },
+      { name: "Duke of Wellington", addr: "179 Portobello Rd, W11 2ED", lat: 51.5151956, lng: -0.2047896, drink: "shot", note: "Short hole. One shot, keep walking." },
+      { name: "The Elgin", addr: "96 Ladbroke Grove, W11 1PY", lat: 51.5162421, lng: -0.2088570, drink: "pint", note: "Big old boozer. Restore the card with a pint." },
+      { name: "The Pelican", addr: "45 All Saints Rd, W11 1HE", lat: 51.5188056, lng: -0.2046257, drink: "wine", note: "All Saints. Wine, then east." },
+      { name: "The Cow", addr: "89 Westbourne Park Rd, W2 5QH", lat: 51.5191522, lng: -0.1953645, drink: "guinness", note: "Guinness hole. Oysters if anyone's still hungry." },
+      { name: "Prince Bonaparte", addr: "80 Chepstow Rd, W2 5BE", lat: 51.5173814, lng: -0.1955340, drink: "highball", note: "Highball. Don't linger." },
+      { name: "Princess Royal", addr: "47 Hereford Rd, W2 5AH", lat: 51.5155848, lng: -0.1943554, drink: "shot", note: "Another short. One and done." },
+      { name: "Cock & Bottle", addr: "17 Needham Rd, W11 2RP", lat: 51.5154218, lng: -0.1975389, drink: "pint", note: "19th-hole energy. Tally on the pavement, cabs on Westbourne Grove." },
+    ];
+
+    const KEY = "nh-open-2026";
+    const state = load();
+    let map, markers = [], current = state.hole || 0;
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(KEY)) || defaults(); }
+      catch { return defaults(); }
+    }
+    function defaults() {
+      return {
+        hole: 0,
+        drinks: HOLES.map(h => h.drink),
+        players: ["Me"],
+        active: 0,
+        scores: { Me: Array(12).fill(null) },
+        pens: { Me: Array(12).fill(null) },
+      };
+    }
+    function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+    function parOf(i) { return DRINKS[state.drinks[i]].par; }
+    function coursePar() { return state.drinks.reduce((s, d) => s + DRINKS[d].par, 0); }
+    function playerTotal(name) {
+      const s = state.scores[name] || [];
+      const p = state.pens[name] || [];
+      return s.reduce((acc, v, i) => acc + (v == null ? 0 : v) + (p[i] || 0), 0);
+    }
+    function vsPar(name) {
+      const s = state.scores[name] || [];
+      let played = 0, diff = 0;
+      s.forEach((v, i) => {
+        if (v == null) return;
+        played++;
+        diff += v + (state.pens[name][i] || 0) - parOf(i);
+      });
+      return { played, diff };
+    }
+
+    function gmaps(h) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.name + " " + h.addr)}`;
+    }
+    function amaps(h) {
+      return `https://maps.apple.com/?daddr=${h.lat},${h.lng}&q=${encodeURIComponent(h.name)}`;
+    }
+    function walkM(a, b) {
+      const r = Math.PI / 180;
+      const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+      const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+      return Math.round(2 * 6371000 * Math.asin(Math.sqrt(x)));
+    }
+    function penCode(name, i) {
+      return state.pens.code?.[name]?.[i] || null;
+    }
+    function setPen(name, i, code, val) {
+      state.pens.code = state.pens.code || {};
+      state.pens.code[name] = state.pens.code[name] || Array(12).fill(null);
+      const same = state.pens.code[name][i] === code;
+      state.pens.code[name][i] = same ? null : code;
+      state.pens[name][i] = same ? 0 : val;
+      save();
+    }
+
+    const mapEl = document.getElementById("map");
+    map = L.map(mapEl, { zoomControl: false, attributionControl: false });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+    const line = L.polyline(HOLES.map(h => [h.lat, h.lng]), { color: "#e23d28", weight: 3, dashArray: "6 8", opacity: 0.9 }).addTo(map);
+
+    function pinIcon(n, on) {
+      return L.divIcon({
+        className: "",
+        iconSize: [28, 36],
+        iconAnchor: [13, 34],
+        html: `<div class="pin${on ? " now" : ""}"><i><span>${n}</span></i></div>`,
+      });
+    }
+    HOLES.forEach((h, i) => {
+      const m = L.marker([h.lat, h.lng], { icon: pinIcon(i + 1, i === current), riseOnHover: true })
+        .addTo(map)
+        .on("click", () => setHole(i));
+      markers.push(m);
+    });
+    map.fitBounds(line.getBounds().pad(0.18));
+
+    function setHole(i) {
+      current = i;
+      state.hole = i;
+      save();
+      markers.forEach((m, n) => m.setIcon(pinIcon(n + 1, n === i)));
+      renderSheet();
+      renderList();
+      renderRunning();
+      map.panTo([HOLES[i].lat, HOLES[i].lng], { animate: true });
+    }
+
+    function renderSheet() {
+      const i = current;
+      const h = HOLES[i];
+      const drink = state.drinks[i];
+      const par = parOf(i);
+      const name = state.players[state.active];
+      const sips = (state.scores[name] || [])[i];
+      const pen = (state.pens[name] || [])[i] || 0;
+      const next = HOLES[i + 1];
+      const walk = next ? walkM(h, next) : 0;
+      const code = penCode(name, i);
+      const opts = Object.entries(DRINKS).map(([k, v]) =>
+        `<option value="${k}" ${k === drink ? "selected" : ""}>${v.label} · par ${v.par}</option>`
+      ).join("");
+      const pad = [1, 2, 3, 4, 5, 6, 7, 8].map(n =>
+        `<button type="button" data-sips="${n}" class="${sips === n ? "on" : ""}">${n}</button>`
+      ).join("");
+      document.getElementById("holeSheet").innerHTML = `
+        <div class="hole-kicker"><span>Hole ${i + 1} of 12</span><span>Par ${par}${next ? " · next " + walk + "m" : ""}</span></div>
+        <h2>${h.name}</h2>
+        <p class="addr">${h.addr}<br>${h.note}</p>
+        <div class="row">
+          <a class="maps" href="${gmaps(h)}" target="_blank" rel="noopener">Google Maps</a>
+          <a class="maps ghost" href="${amaps(h)}" target="_blank" rel="noopener">Apple Maps</a>
+        </div>
+        <label class="drink">Tonight's drink</label>
+        <select id="drinkSel">${opts}</select>
+        <div class="parbox"><span>Sips for ${name}</span><b>${sips == null ? "—" : sips + pen} <span style="font-size:12px;color:#c9bfa8">/ par ${par}</span></b></div>
+        <div class="score-pad">${pad}</div>
+        <div class="pens">
+          <button type="button" data-code="spill" data-val="1" class="${code === "spill" ? "on" : ""}">Spill +1</button>
+          <button type="button" data-code="loo" data-val="1" class="${code === "loo" ? "on" : ""}">Loo +1</button>
+          <button type="button" data-code="left" data-val="2" class="${code === "left" ? "on" : ""}">Left +2</button>
+        </div>
+        <div class="navh">
+          <button type="button" class="dim" id="prevH">Previous</button>
+          <button type="button" id="nextH">${next ? "Next · " + next.name : "See card"}</button>
+        </div>
+      `;
+      document.getElementById("drinkSel").onchange = (e) => {
+        state.drinks[i] = e.target.value;
+        save(); renderSheet(); renderList(); renderTable(); renderRunning();
+      };
+      document.querySelectorAll("[data-sips]").forEach(btn => {
+        btn.onclick = () => {
+          const n = Number(btn.dataset.sips);
+          state.scores[name][i] = state.scores[name][i] === n ? null : n;
+          save(); renderSheet(); renderTable(); renderRunning();
+        };
+      });
+      document.querySelectorAll("[data-code]").forEach(btn => {
+        btn.onclick = () => {
+          setPen(name, i, btn.dataset.code, Number(btn.dataset.val));
+          renderSheet(); renderTable(); renderRunning();
+        };
+      });
+      document.getElementById("prevH").onclick = () => setHole(Math.max(0, i - 1));
+      document.getElementById("nextH").onclick = () => {
+        if (i < 11) setHole(i + 1);
+        else document.querySelector('[data-tab="score"]').click();
+      };
+    }
+
+    function renderList() {
+      document.getElementById("holeList").innerHTML = HOLES.map((h, i) => `
+        <button class="hcard ${i === current ? "on" : ""}" data-i="${i}">
+          <div class="hole-kicker"><span class="n">Hole ${i + 1}</span><span>Par ${parOf(i)} · ${DRINKS[state.drinks[i]].label}</span></div>
+          <h3>${h.name}</h3>
+          <p>${h.addr}</p>
+        </button>
+      `).join("");
+      document.querySelectorAll(".hcard").forEach(el => el.onclick = () => {
+        setHole(Number(el.dataset.i));
+        document.querySelector('[data-tab="map"]').click();
+      });
+    }
+
+    function renderPlayers() {
+      document.getElementById("playerBar").innerHTML =
+        state.players.map((p, i) => `<button type="button" class="${i === state.active ? "on" : ""}" data-p="${i}">${p}</button>`).join("") +
+        `<button type="button" class="add" id="addPlayer">+ player</button>`;
+      document.querySelectorAll("#playerBar [data-p]").forEach(b => b.onclick = () => {
+        state.active = Number(b.dataset.p); save(); renderPlayers(); renderTable(); renderSheet(); renderRunning();
+      });
+      document.getElementById("addPlayer").onclick = () => {
+        const n = prompt("Player name?");
+        if (!n) return;
+        const name = n.trim();
+        if (!name || state.players.includes(name)) return;
+        state.players.push(name);
+        state.scores[name] = Array(12).fill(null);
+        state.pens[name] = Array(12).fill(null);
+        state.active = state.players.length - 1;
+        save(); renderPlayers(); renderTable(); renderSheet();
+      };
+    }
+
+    function renderTable() {
+      const name = state.players[state.active];
+      const rows = HOLES.map((h, i) => {
+        const s = state.scores[name][i];
+        const p = state.pens[name][i] || 0;
+        const tot = s == null ? "·" : s + p;
+        const d = s == null ? "" : (s + p - parOf(i));
+        const vs = d === "" ? "" : d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`;
+        return `<tr><td class="mono">${i + 1}</td><td>${h.name}</td><td>${parOf(i)}</td><td>${tot}</td><td class="vs">${vs}</td></tr>`;
+      }).join("");
+      const { diff, played } = vsPar(name);
+      const vs = played ? (diff === 0 ? "E" : diff > 0 ? `+${diff}` : `${diff}`) : "—";
+      document.getElementById("scoreTable").innerHTML = `
+        <thead><tr><th>#</th><th>${name}</th><th>Par</th><th>Score</th><th>vs</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td></td><td>Total</td><td>${coursePar()}</td><td>${playerTotal(name) || "—"}</td><td>${vs}</td></tr></tfoot>
+      `;
+    }
+
+    function renderRunning() {
+      const name = state.players[state.active];
+      const { diff, played } = vsPar(name);
+      document.getElementById("running").textContent = played ? (diff === 0 ? "E" : diff > 0 ? `+${diff}` : `${diff}`) : "E";
+    }
+
+    document.getElementById("copyCard").onclick = async () => {
+      const name = state.players[state.active];
+      const lines = ["NOTTING HILL OPEN", name, ""];
+      HOLES.forEach((h, i) => {
+        const s = state.scores[name][i];
+        const p = state.pens[name][i] || 0;
+        const tot = s == null ? "-" : s + p;
+        lines.push(`${i + 1}. ${h.name}  ${DRINKS[state.drinks[i]].label}  par ${parOf(i)}  ${tot}`);
+      });
+      const { diff } = vsPar(name);
+      lines.push("", `Total ${playerTotal(name)}  (${diff === 0 ? "E" : diff > 0 ? "+" + diff : diff}) vs par ${coursePar()}`);
+      const text = lines.join("\n");
+      try { await navigator.clipboard.writeText(text); alert("Copied. Paste into the group chat."); }
+      catch { prompt("Copy this:", text); }
+    };
+    document.getElementById("resetScores").onclick = () => {
+      if (!confirm("Clear your sips and penalties?")) return;
+      const name = state.players[state.active];
+      state.scores[name] = Array(12).fill(null);
+      state.pens[name] = Array(12).fill(null);
+      if (state.pens.code) state.pens.code[name] = Array(12).fill(null);
+      save(); renderSheet(); renderTable(); renderRunning();
+    };
+
+    document.querySelectorAll(".tabs button").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
+        btn.classList.add("on");
+        document.querySelectorAll(".panel").forEach(p => p.classList.remove("on"));
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("on");
+        if (btn.dataset.tab === "map") setTimeout(() => map.invalidateSize(), 50);
+      };
+    });
+
+    renderSheet();
+    renderList();
+    renderPlayers();
+    renderTable();
+    renderRunning();
+    setTimeout(() => map.invalidateSize(), 200);
+  </script>
+</body>
+</html>
