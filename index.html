@@ -129,6 +129,9 @@
       font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
     }
     .sheet h2 { margin: 4px 0 14px; font-size: 26px; }
+    .hole-round { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
+    .hole-round:first-of-type { margin-top: 0; }
+    .hole-round h3 { margin: 0; font-family: Syne, sans-serif; font-size: 17px; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip, .maps {
       display: inline-flex; align-items: center; justify-content: center;
@@ -256,7 +259,7 @@
       <div class="rules">
         <article>
           <h2>How we play</h2>
-          <p>Each pub is a hole. Finish the assigned drink in as few sips as possible. Lowest total wins. A down-in-one is a hole-in-one, whatever the par.</p>
+          <p>Each pub has two holes, played in order. Finish each assigned drink in as few sips as possible. Lowest total wins. A down-in-one is a hole-in-one, whatever the par.</p>
           <h3>Par</h3>
           <ul>
             <li>Pint · par 4</li>
@@ -272,7 +275,7 @@
             <li>Leave any drink +2</li>
           </ul>
           <h3>Pace</h3>
-          <p>One drink per pub. Water between holes. Sit one out whenever you like — switch to a soft and keep the card going.</p>
+          <p>Two drinks per pub, one for each hole. Water between holes. Sit one out whenever you like — switch to a soft and keep the card going.</p>
           <p>Costume: polos, visors, argyle, ridiculous trousers. Mini club optional, encouraged.</p>
           <p><a href="https://www.socialsticks.co.uk/blog/play-pub-golf-tips-rules-costumes">Source rules</a></p>
           <h3>Put it on your Home Screen</h3>
@@ -304,24 +307,23 @@
       soft: { label: "Soft drink", par: 4 },
     };
 
-    const HOLES = [
-      { name: "Churchill Arms", addr: "119 Kensington Church St, W8 7LN", lat: 51.5068785, lng: -0.1948694, drink: "pint", note: "Flower-covered Fuller's. Warm-up pint." },
-      { name: "Uxbridge Arms", addr: "13 Uxbridge St, W8 7TQ", lat: 51.5083236, lng: -0.1988269, drink: "wine", note: "Hillgate Village. Tiny, proper." },
-      { name: "Prince Albert", addr: "11 Pembridge Rd, W11 3HQ", lat: 51.5095361, lng: -0.1975022, drink: "pint", note: "Notting Hill Gate. Pint on the pavement." },
-      { name: "Sun in Splendour", addr: "7 Portobello Rd, W11 3DA", lat: 51.5109437, lng: -0.1978302, drink: "cocktail", note: "Bottom of Portobello. Cocktail hole." },
-      { name: "Earl of Lonsdale", addr: "277–281 Westbourne Grove, W11 2QA", lat: 51.5134425, lng: -0.2027103, drink: "pint", note: "Corner of Portobello. Carnival photos on the walls." },
-      { name: "Duke of Wellington", addr: "179 Portobello Rd, W11 2ED", lat: 51.5151956, lng: -0.2047896, drink: "shot", note: "Short hole. One shot, keep walking." },
-      { name: "The Elgin", addr: "96 Ladbroke Grove, W11 1PY", lat: 51.5162421, lng: -0.2088570, drink: "pint", note: "Big old boozer. Restore the card with a pint." },
-      { name: "The Pelican", addr: "45 All Saints Rd, W11 1HE", lat: 51.5188056, lng: -0.2046257, drink: "wine", note: "All Saints. Wine, then east." },
-      { name: "The Cow", addr: "89 Westbourne Park Rd, W2 5QH", lat: 51.5191522, lng: -0.1953645, drink: "guinness", note: "Guinness hole. Oysters if anyone's still hungry." },
-      { name: "Prince Bonaparte", addr: "80 Chepstow Rd, W2 5BE", lat: 51.5173814, lng: -0.1955340, drink: "highball", note: "Highball. Don't linger." },
-      { name: "Princess Royal", addr: "47 Hereford Rd, W2 5AH", lat: 51.5155848, lng: -0.1943554, drink: "shot", note: "Another short. One and done." },
-      { name: "Cock & Bottle", addr: "17 Needham Rd, W11 2RP", lat: 51.5154218, lng: -0.1975389, drink: "pint", note: "19th-hole energy. Tally on the pavement, cabs on Westbourne Grove." },
+    const PUBS = [
+      { name: "The Churchill Arms", addr: "119 Kensington Church St, W8 7LN", lat: 51.5068785, lng: -0.1948694, drinks: ["pint", "wine"], walkMin: null },
+      { name: "The Uxbridge Arms", addr: "13 Uxbridge St, W8 7TQ", lat: 51.5083236, lng: -0.1988269, drinks: ["wine", "shot"], walkMin: 7 },
+      { name: "Prince Albert", addr: "11 Pembridge Rd, W11 3HQ", lat: 51.5095361, lng: -0.1975022, drinks: ["wine", "guinness"], walkMin: 5 },
+      { name: "The Sun In Splendour", addr: "7 Portobello Rd, W11 3DA", lat: 51.5109437, lng: -0.1978302, drinks: ["shot", "wine"], walkMin: 10 },
+      { name: "The Good Oak", addr: "137 Westbourne Park Rd, W2 5QL", lat: 51.5186748, lng: -0.1976473, drinks: ["highball", "shot"], walkMin: 12 },
+      { name: "The Elgin", addr: "96 Ladbroke Grove, W11 1PY", lat: 51.5162421, lng: -0.2088570, drinks: ["highball", "pint"], walkMin: 8 },
     ];
+    const HOLES = PUBS.flatMap((pub, pubIndex) =>
+      pub.drinks.map((drink, inPub) => ({ ...pub, pubIndex, inPub, drink }))
+    );
 
-    const KEY = "nh-open-2026";
+    const OLD_KEY = "nh-open-2026";
+    const KEY = "nh-open-2026-paired";
+    localStorage.removeItem(OLD_KEY);
     const state = load();
-    let map, markers = [], current = state.hole || 0;
+    let map, markers = [], current = state.pub || 0;
 
     function load() {
       try { return JSON.parse(localStorage.getItem(KEY)) || defaults(); }
@@ -329,12 +331,12 @@
     }
     function defaults() {
       return {
-        hole: 0,
+        pub: 0,
         drinks: HOLES.map(h => h.drink),
         players: ["Me"],
         active: 0,
-        scores: { Me: Array(12).fill(null) },
-        pens: { Me: Array(12).fill(null) },
+        scores: { Me: Array(HOLES.length).fill(null) },
+        pens: { Me: Array(HOLES.length).fill(null) },
       };
     }
     function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -364,18 +366,12 @@
     function amaps(h) {
       return `https://maps.apple.com/?daddr=${h.lat},${h.lng}&q=${encodeURIComponent(h.name)}`;
     }
-    function walkM(a, b) {
-      const r = Math.PI / 180;
-      const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
-      const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
-      return Math.round(2 * 6371000 * Math.asin(Math.sqrt(x)));
-    }
     function penCode(name, i) {
       return state.pens.code?.[name]?.[i] || null;
     }
     function setPen(name, i, code, val) {
       state.pens.code = state.pens.code || {};
-      state.pens.code[name] = state.pens.code[name] || Array(12).fill(null);
+      state.pens.code[name] = state.pens.code[name] || Array(HOLES.length).fill(null);
       const same = state.pens.code[name][i] === code;
       state.pens.code[name][i] = same ? null : code;
       state.pens[name][i] = same ? 0 : val;
@@ -388,7 +384,7 @@
       maxZoom: 19,
       attribution: "© OpenStreetMap",
     }).addTo(map);
-    const line = L.polyline(HOLES.map(h => [h.lat, h.lng]), { color: "#e23d28", weight: 3, dashArray: "6 8", opacity: 0.9 }).addTo(map);
+    const line = L.polyline(PUBS.map(h => [h.lat, h.lng]), { color: "#e23d28", weight: 3, dashArray: "6 8", opacity: 0.9 }).addTo(map);
 
     function pinIcon(n, on) {
       return L.divIcon({
@@ -398,112 +394,131 @@
         html: `<div class="pin${on ? " now" : ""}"><i><span>${n}</span></i></div>`,
       });
     }
-    HOLES.forEach((h, i) => {
+    PUBS.forEach((h, i) => {
       const m = L.marker([h.lat, h.lng], { icon: pinIcon(i + 1, i === current), riseOnHover: true })
         .addTo(map)
-        .on("click", () => setHole(i));
+        .on("click", () => setPub(i));
       markers.push(m);
     });
     map.fitBounds(line.getBounds().pad(0.18));
 
-    function setHole(i) {
+    function setPub(i) {
       current = i;
-      state.hole = i;
+      state.pub = i;
       save();
       markers.forEach((m, n) => m.setIcon(pinIcon(n + 1, n === i)));
       renderSheet();
       renderList();
       renderRunning();
-      map.panTo([HOLES[i].lat, HOLES[i].lng], { animate: true });
+      map.panTo([PUBS[i].lat, PUBS[i].lng], { animate: true });
     }
 
-    function renderSheet() {
-      const i = current;
-      const h = HOLES[i];
+    function holeEditor(i, name) {
       const drink = state.drinks[i];
       const par = parOf(i);
-      const name = state.players[state.active];
       const sips = (state.scores[name] || [])[i];
       const pen = (state.pens[name] || [])[i] || 0;
-      const next = HOLES[i + 1];
-      const walk = next ? walkM(h, next) : 0;
       const code = penCode(name, i);
       const opts = Object.entries(DRINKS).map(([k, v]) =>
         `<option value="${k}" ${k === drink ? "selected" : ""}>${v.label} · par ${v.par}</option>`
       ).join("");
-      const PAD_MAX = 7;
-      const custom = sips != null && sips > PAD_MAX;
+      const custom = sips != null && sips > 7;
       const pad = [1, 2, 3, 4, 5, 6, 7].map(n =>
-        `<button type="button" data-sips="${n}" class="${sips === n ? "on" : ""}">${n}</button>`
+        `<button type="button" data-hole="${i}" data-sips="${n}" class="${sips === n ? "on" : ""}">${n}</button>`
       ).join("") +
-        `<button type="button" id="moreSips" class="${custom ? "on" : ""}">${custom ? sips : "More"}</button>`;
+        `<button type="button" data-hole="${i}" data-more class="${custom ? "on" : ""}">${custom ? sips : "More"}</button>`;
+      return `
+        <section class="hole-round">
+          <div class="hole-kicker"><h3>Hole ${i + 1}</h3><span>Par ${par}</span></div>
+          <label class="drink" for="drink-${i}">Tonight's drink</label>
+          <select id="drink-${i}" data-drink-hole="${i}">${opts}</select>
+          <div class="parbox"><span>Sips for ${name}</span><b>${sips == null ? "—" : sips + pen} <span style="font-size:12px;color:#c9bfa8">/ par ${par}</span></b></div>
+          <div class="score-pad">${pad}</div>
+          <div class="pens">
+            <button type="button" data-hole="${i}" data-code="spill" data-val="1" class="${code === "spill" ? "on" : ""}">Spill +1</button>
+            <button type="button" data-hole="${i}" data-code="loo" data-val="1" class="${code === "loo" ? "on" : ""}">Loo +1</button>
+            <button type="button" data-hole="${i}" data-code="left" data-val="2" class="${code === "left" ? "on" : ""}">Left +2</button>
+          </div>
+        </section>`;
+    }
+
+    function renderSheet() {
+      const pub = PUBS[current];
+      const name = state.players[state.active];
+      const first = current * 2;
+      const pubPar = parOf(first) + parOf(first + 1);
+      const walk = pub.walkMin ? ` · ${pub.walkMin} min walk` : "";
       document.getElementById("holeSheet").innerHTML = `
-        <div class="hole-kicker"><span>Hole ${i + 1} of 12</span><span>Par ${par}${next ? " · next " + walk + "m" : ""}</span></div>
-        <h2>${h.name}</h2>
+        <div class="hole-kicker"><span>Stop ${current + 1} of ${PUBS.length}</span><span>Holes ${first + 1}–${first + 2} · par ${pubPar}${walk}</span></div>
+        <h2>${pub.name}</h2>
         <div class="row">
-          <a class="maps" href="${gmaps(h)}" target="_blank" rel="noopener">Google Maps</a>
-          <a class="maps ghost" href="${amaps(h)}" target="_blank" rel="noopener">Apple Maps</a>
+          <a class="maps" href="${gmaps(pub)}" target="_blank" rel="noopener">Google Maps</a>
+          <a class="maps ghost" href="${amaps(pub)}" target="_blank" rel="noopener">Apple Maps</a>
         </div>
-        <label class="drink">Tonight's drink</label>
-        <select id="drinkSel">${opts}</select>
-        <div class="parbox"><span>Sips for ${name}</span><b>${sips == null ? "—" : sips + pen} <span style="font-size:12px;color:#c9bfa8">/ par ${par}</span></b></div>
-        <div class="score-pad">${pad}</div>
-        <div class="pens">
-          <button type="button" data-code="spill" data-val="1" class="${code === "spill" ? "on" : ""}">Spill +1</button>
-          <button type="button" data-code="loo" data-val="1" class="${code === "loo" ? "on" : ""}">Loo +1</button>
-          <button type="button" data-code="left" data-val="2" class="${code === "left" ? "on" : ""}">Left +2</button>
-        </div>
+        ${holeEditor(first, name)}
+        ${holeEditor(first + 1, name)}
         <div class="navh">
-          <button type="button" class="dim" id="prevH">Previous</button>
-          <button type="button" id="nextH">${next ? "Next" : "See card"}</button>
+          <button type="button" class="dim" id="prevH">Previous pub</button>
+          <button type="button" id="nextH">${current < PUBS.length - 1 ? "Next pub" : "See card"}</button>
         </div>
       `;
-      document.getElementById("drinkSel").onchange = (e) => {
-        state.drinks[i] = e.target.value;
-        save(); renderSheet(); renderList(); renderTable(); renderRunning();
-      };
+      document.querySelectorAll("[data-drink-hole]").forEach(sel => {
+        sel.onchange = (e) => {
+          state.drinks[Number(e.target.dataset.drinkHole)] = e.target.value;
+          save(); renderSheet(); renderList(); renderTable(); renderRunning();
+        };
+      });
       document.querySelectorAll("[data-sips]").forEach(btn => {
         btn.onclick = () => {
+          const i = Number(btn.dataset.hole);
           const n = Number(btn.dataset.sips);
           state.scores[name][i] = state.scores[name][i] === n ? null : n;
           save(); renderSheet(); renderTable(); renderRunning();
         };
       });
-      document.getElementById("moreSips").onclick = () => {
-        const entered = prompt("Sips for this hole?", sips == null ? "" : String(sips));
-        if (entered === null) return;
-        const trimmed = entered.trim();
-        if (trimmed === "") {
-          state.scores[name][i] = null;
-        } else {
-          const n = Number(trimmed);
-          if (!Number.isInteger(n) || n < 1 || n > 99) return;
-          state.scores[name][i] = n;
-        }
-        save(); renderSheet(); renderTable(); renderRunning();
-      };
+      document.querySelectorAll("[data-more]").forEach(btn => {
+        btn.onclick = () => {
+          const i = Number(btn.dataset.hole);
+          const sips = state.scores[name][i];
+          const entered = prompt("Sips for this hole?", sips == null ? "" : String(sips));
+          if (entered === null) return;
+          const trimmed = entered.trim();
+          if (trimmed === "") state.scores[name][i] = null;
+          else {
+            const n = Number(trimmed);
+            if (!Number.isInteger(n) || n < 1 || n > 99) return;
+            state.scores[name][i] = n;
+          }
+          save(); renderSheet(); renderTable(); renderRunning();
+        };
+      });
       document.querySelectorAll("[data-code]").forEach(btn => {
         btn.onclick = () => {
-          setPen(name, i, btn.dataset.code, Number(btn.dataset.val));
+          setPen(name, Number(btn.dataset.hole), btn.dataset.code, Number(btn.dataset.val));
           renderSheet(); renderTable(); renderRunning();
         };
       });
-      document.getElementById("prevH").onclick = () => setHole(Math.max(0, i - 1));
+      document.getElementById("prevH").onclick = () => setPub(Math.max(0, current - 1));
       document.getElementById("nextH").onclick = () => {
-        if (i < 11) setHole(i + 1);
+        if (current < PUBS.length - 1) setPub(current + 1);
         else document.querySelector('[data-tab="score"]').click();
       };
     }
 
     function renderList() {
-      document.getElementById("holeList").innerHTML = HOLES.map((h, i) => `
-        <button class="hcard ${i === current ? "on" : ""}" data-i="${i}">
-          <div class="hole-kicker"><span class="n">Hole ${i + 1}</span><span>Par ${parOf(i)} · ${DRINKS[state.drinks[i]].label}</span></div>
-          <h3>${h.name}</h3>
-        </button>
-      `).join("");
+      document.getElementById("holeList").innerHTML = PUBS.map((pub, i) => {
+        const first = i * 2;
+        const drinks = `${DRINKS[state.drinks[first]].label} → ${DRINKS[state.drinks[first + 1]].label}`;
+        const walk = pub.walkMin ? ` · ${pub.walkMin} min walk` : "";
+        return `
+          <button class="hcard ${i === current ? "on" : ""}" data-i="${i}">
+            <div class="hole-kicker"><span class="n">Holes ${first + 1}–${first + 2}</span><span>Par ${parOf(first) + parOf(first + 1)}${walk}</span></div>
+            <h3>${pub.name}</h3>
+            <div style="margin-top:5px">${drinks}</div>
+          </button>`;
+      }).join("");
       document.querySelectorAll(".hcard").forEach(el => el.onclick = () => {
-        setHole(Number(el.dataset.i));
+        setPub(Number(el.dataset.i));
         document.querySelector('[data-tab="map"]').click();
       });
     }
@@ -539,8 +554,8 @@
         const name = n.trim();
         if (!name || state.players.includes(name)) return;
         state.players.push(name);
-        state.scores[name] = Array(12).fill(null);
-        state.pens[name] = Array(12).fill(null);
+        state.scores[name] = Array(HOLES.length).fill(null);
+        state.pens[name] = Array(HOLES.length).fill(null);
         state.active = state.players.length - 1;
         save(); renderPlayers(); renderTable(); renderSheet();
       };
@@ -548,13 +563,18 @@
 
     function renderTable() {
       const name = state.players[state.active];
-      const rows = HOLES.map((h, i) => {
-        const s = state.scores[name][i];
-        const p = state.pens[name][i] || 0;
-        const tot = s == null ? "·" : s + p;
-        const d = s == null ? "" : (s + p - parOf(i));
-        const vs = d === "" ? "" : fmtDiff(d);
-        return `<tr><td class="mono">${i + 1}</td><td>${h.name}</td><td>${parOf(i)}</td><td>${tot}</td><td class="vs">${vs}</td></tr>`;
+      const rows = PUBS.map((pub, pubIndex) => {
+        const first = pubIndex * 2;
+        let score = 0, diff = 0, played = 0;
+        [first, first + 1].forEach(i => {
+          const s = state.scores[name][i];
+          if (s == null) return;
+          const total = s + (state.pens[name][i] || 0);
+          score += total;
+          diff += total - parOf(i);
+          played++;
+        });
+        return `<tr><td class="mono">${first + 1}–${first + 2}</td><td>${pub.name}</td><td>${parOf(first) + parOf(first + 1)}</td><td>${played ? score : "·"}</td><td class="vs">${played ? fmtDiff(diff) : ""}</td></tr>`;
       }).join("");
       const { diff, played } = vsPar(name);
       const vs = played ? fmtDiff(diff) : "0";
@@ -573,11 +593,14 @@
     document.getElementById("copyCard").onclick = async () => {
       const name = state.players[state.active];
       const lines = ["NOTTING HILL OPEN", name, ""];
-      HOLES.forEach((h, i) => {
-        const s = state.scores[name][i];
-        const p = state.pens[name][i] || 0;
-        const tot = s == null ? "-" : s + p;
-        lines.push(`${i + 1}. ${h.name}  ${DRINKS[state.drinks[i]].label}  par ${parOf(i)}  ${tot}`);
+      PUBS.forEach((pub, pubIndex) => {
+        const first = pubIndex * 2;
+        const holeText = [first, first + 1].map(i => {
+          const s = state.scores[name][i];
+          const total = s == null ? "-" : s + (state.pens[name][i] || 0);
+          return `${DRINKS[state.drinks[i]].label} ${total}`;
+        }).join(" + ");
+        lines.push(`${first + 1}–${first + 2}. ${pub.name}  ${holeText}  par ${parOf(first) + parOf(first + 1)}`);
       });
       const { diff } = vsPar(name);
       lines.push("", `Total ${playerTotal(name)}  (${fmtDiff(diff)}) vs par ${coursePar()}`);
@@ -588,9 +611,9 @@
     document.getElementById("resetScores").onclick = () => {
       if (!confirm("Clear your sips and penalties?")) return;
       const name = state.players[state.active];
-      state.scores[name] = Array(12).fill(null);
-      state.pens[name] = Array(12).fill(null);
-      if (state.pens.code) state.pens.code[name] = Array(12).fill(null);
+      state.scores[name] = Array(HOLES.length).fill(null);
+      state.pens[name] = Array(HOLES.length).fill(null);
+      if (state.pens.code) state.pens.code[name] = Array(HOLES.length).fill(null);
       save(); renderSheet(); renderTable(); renderRunning();
     };
 
